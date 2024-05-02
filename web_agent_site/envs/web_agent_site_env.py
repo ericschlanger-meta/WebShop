@@ -1,24 +1,30 @@
 import gym
-import logging
 import random
 import requests
 import string
+import os
 import time
 
 from bs4 import BeautifulSoup
 from bs4.element import Comment
-from gym import spaces
-from os.path import join, dirname, abspath
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import ElementNotInteractableException, NoSuchElementException
 from web_agent_site.engine.engine import parse_action, END_BUTTON
 
 class WebAgentSiteEnv(gym.Env):
     """Gym environment for HTML mode of WebShop environment"""
+
+    RESOLUTIONS = [
+        {'width': 1920, 'height': 1080},
+        {'width': 1536, 'height': 864},
+        {'width': 1366, 'height': 768},
+        {'width': 1280, 'height': 720},
+    ]
+    viewport_width = 0
+    viewport_height = 0
 
     def __init__(self, observation_mode='html', **kwargs):
         """
@@ -42,16 +48,50 @@ class WebAgentSiteEnv(gym.Env):
         if 'render' not in kwargs or not kwargs['render']:
             options.add_argument("--headless")  # don't show browser
         self.browser = webdriver.Chrome(options=options)
+        self.resolution = random.choice(self.RESOLUTIONS)
+        self.viewport_width = self.resolution['width']
+        self.viewport_height = self.resolution['height']
 
         # Set flags and values for WebShop session
         self.text_to_clickable = None
+        self.radio_names_to_labels = {}
         self.assigned_session = kwargs.get('session')
         self.session = None
         self.reset()
 
+    def get_resolution(self):
+        return self.resolution
+
+    def get_bb(self, action):
+        """
+        Returns the bounding box for the given action element
+        """
+        action_name, action_arg = parse_action(action)
+        if action_name == 'search':
+            try:
+                search_bar = self.browser.find_element(By.ID, 'search_input')
+            except NoSuchElementException:
+                raise ValueError('no search bar found')
+            return search_bar.rect
+        elif action_name == 'click':
+            button = self.text_to_clickable[action_arg]
+            if action_arg in self.radio_names_to_labels.keys():
+                return self.radio_names_to_labels[action_arg].rect
+            else:
+                return button.rect
+        return None
+    
+    def get_y_offset(self):
+        return self.browser.execute_script("return window.pageYOffset;")
+    
+    def scroll_down(self, amount):
+        self.browser.execute_script(f"window.scrollBy(0, {amount});")
+
     def step(self, action):
         """
-        Takes an action, updates WebShop environment, and returns (observation, reward, done, info)
+        Takes an action, updates WebShop environment, and returns (observation, reward, done, info, bounding_box)
+        If the element to be interacted with is outside below the viewport, this function will scroll the viewport
+        and take a screenshot until the element is within the viewport.
 
         Arguments:
         action (`str`): An action should be of the following structure:
@@ -121,6 +161,9 @@ class WebAgentSiteEnv(gym.Env):
         for opt in buying_options:
             opt_value = opt.get_attribute('value')
             self.text_to_clickable[f'{opt_value}'] = opt
+            opt_id = opt.get_attribute('id')
+            label = self.browser.find_element(By.CSS_SELECTOR, f"label[for='{opt_id}']")
+            self.radio_names_to_labels[f'{opt_value}'] = label
         return dict(
             has_search_bar=has_search_bar,
             clickables=list(self.text_to_clickable.keys()),
@@ -196,6 +239,13 @@ class WebAgentSiteEnv(gym.Env):
     def observation_space(self):
         return NotImplementedError
 
+    def save_screenshot(self, step_idx):
+        user_log_dir = Path(f'user_session_logs/mturk/{self.session}')
+        if not os.path.exists(user_log_dir):
+            os.makedirs(user_log_dir)
+        user_log_dir.mkdir(parents=True, exist_ok=True)
+        self.browser.save_screenshot(Path.joinpath(user_log_dir, f'{step_idx}.png'))
+
     def reset(self):
         """Create a new session and reset environment variables"""
         if self.assigned_session is not None:
@@ -203,14 +253,10 @@ class WebAgentSiteEnv(gym.Env):
         else:
             self.session = ''.join(random.choices(string.ascii_lowercase, k=5))
         init_url = f'http://127.0.0.1:3000/{self.session}'
-        self.browser.set_window_size(500, 500)
+        self.browser.set_window_size(self.viewport_width, self.viewport_height)
         self.browser.get(init_url)
 
         self.instruction_text = self.get_instruction_text()
-
-        user_log_dir = Path('user_session_logs/mturk')
-        user_log_dir.mkdir(parents=True, exist_ok=True)
-        self.browser.save_screenshot(Path.joinpath(user_log_dir, 'brolo.png'))
 
         return self.observation, None
 

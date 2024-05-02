@@ -1,6 +1,7 @@
 import bisect
 import hashlib
 import logging
+import os
 import random
 from os.path import dirname, abspath, join
 
@@ -29,6 +30,8 @@ def random_idx(cum_weights):
 
 def setup_logger(session_id, user_log_dir):
     """Creates a log file and logging object for the corresponding session ID"""
+    if not os.path.exists(user_log_dir):
+        os.makedirs(user_log_dir)
     logger = logging.getLogger(session_id)
     formatter = logging.Formatter('%(message)s')
     file_handler = logging.FileHandler(
@@ -38,6 +41,7 @@ def setup_logger(session_id, user_log_dir):
     file_handler.setFormatter(formatter)
     logger.setLevel(logging.INFO)
     logger.addHandler(file_handler)
+    print(f'Setting up logger for {session_id}')
     return logger
 
 def generate_mturk_code(session_id: str) -> str:

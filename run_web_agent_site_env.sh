@@ -1,2 +1,2 @@
 #!/bin/bash
-python -m run_envs.run_web_agent_site_env --pid $1
+python -m run_envs.run_web_agent_site_env $1
