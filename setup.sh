@@ -21,6 +21,19 @@ if [ -z "$data" ]; then
   helpFunction
 fi
 
+apt update
+apt install default-jdk
+
+wget https://repo.anaconda.com/archive/Anaconda3-2024.02-1-Linux-x86_64.sh
+bash Anaconda3-2024.02-1-Linux-x86_64.sh
+
+source ~/.bashrc
+
+conda create -n webshop python=3.8.13
+conda activate webshop
+
+source ~/.bashrc
+
 # Install Python Dependencies
 pip install -r requirements.txt;
 
