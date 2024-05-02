@@ -13,6 +13,7 @@ from web_agent_site.utils import (
 import json
 import logging
 import requests
+import sys
 
 PARALLEL_ENVS = 1 
 TOTAL_PRODUCTS = 1000
@@ -29,13 +30,13 @@ def format_session(idx):
     return f'fixed_{idx}'
 
 def call_llm(prompt_map):
+    server = sys.argv[1]
     prompt_keys = list(prompt_map.keys())
     prompt_keys.sort()
 
     prompts = [prompt_map[k] for k in prompt_keys]
-
     post_response = requests.post(
-        'https://q0xgtmmhf9hmeg-4000.proxy.runpod.net/predict_batch',
+        f'{server}/predict_batch',
         json = {
             'token': 'ericsecret',
             'prompts': prompts,

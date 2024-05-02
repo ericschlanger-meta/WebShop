@@ -1,3 +1,14 @@
+# AISC
+## Setup
+1. Clone the repo
+2. Run `./setup.sh`
+3. Run the webserver with `./run_dev.sh`
+
+## Run RL
+1. Clone `https://github.com/Msegan/see_things`
+2. Start the inference API server locally by running `python see_things/prototyping/cog_agent_driver/llm_inference_api.py`
+3. Run `./run_web_agent_site_env.sh "http://0.0.0.0:4000"`
+
 # 🛒 WebShop
 
 [![Python version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/release/python-3813/)
